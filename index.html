@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life Grind Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg0: #080810;
+    --bg1: #0f0f1a;
+    --bg2: #161625;
+    --bg3: #1e1e32;
+    --bg4: #252540;
+    --accent: #7b68ee;
+    --accent2: #9f8fef;
+    --accent3: #bd93f9;
+    --gold: #ffd700;
+    --green: #50fa7b;
+    --red: #ff5555;
+    --cyan: #8be9fd;
+    --orange: #ffb86c;
+    --muted: #6272a4;
+    --white: #f8f8f2;
+    --divider: #2a2a45;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg0);
+    color: var(--white);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE TEXTURE */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: .4;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
+
+  /* HEADER */
+  header {
+    padding: 40px 20px 30px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .header-glow {
+    position: absolute;
+    top: -60px; left: 50%;
+    transform: translateX(-50%);
+    width: 500px; height: 200px;
+    background: radial-gradient(ellipse, rgba(123,104,238,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-inner { max-width: 1100px; margin: 0 auto; }
+  .header-top { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  h1 {
+    font-size: clamp(24px, 5vw, 42px);
+    font-weight: 800;
+    color: var(--accent3);
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .header-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 10px;
+    letter-spacing: .5px;
+  }
+
+  /* NAV TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 24px 20px 0;
+    max-width: 1100px;
+    margin: 0 auto;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 6px 6px 0 0;
+    border: 1px solid var(--divider);
+    border-bottom: none;
+    background: var(--bg2);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+    letter-spacing: .5px;
+  }
+  .tab:hover { color: var(--accent2); background: var(--bg3); }
+  .tab.active { background: var(--bg2); color: var(--accent3); border-color: var(--accent); }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--divider);
+    border-radius: 0 12px 12px 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  /* DATE HEADER */
+  .date-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .date-display {
+    font-size: clamp(18px, 4vw, 28px);
+    font-weight: 800;
+    color: var(--white);
+  }
+  .date-display span { color: var(--accent); }
+  .date-nav {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .date-nav button {
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    color: var(--white);
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all .2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .date-nav button:hover { background: var(--accent); border-color: var(--accent); }
+  .today-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 8px 14px;
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    color: var(--muted);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+  }
+  .today-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* FORM GRID */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .field input, .field select {
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    color: var(--white);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all .2s;
+    -webkit-appearance: none;
+    outline: none;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(123,104,238,.15);
+  }
+  .field input::placeholder { color: var(--muted); font-weight: 400; }
+
+  /* TOGGLE BUTTONS */
+  .toggle-group {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--divider);
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: var(--bg3);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+  }
+  .toggle-btn:first-child { border-right: 1px solid var(--divider); }
+  .toggle-btn.active-yes {
+    background: rgba(80,250,123,.15);
+    color: var(--green);
+    border-color: var(--green);
+  }
+  .toggle-btn.active-no {
+    background: rgba(255,85,85,.15);
+    color: var(--red);
+    border-color: var(--red);
+  }
+
+  /* SAVE BUTTON */
+  .save-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--accent);
+    border: none;
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+    margin-top: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .save-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, transparent 50%);
+  }
+  .save-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(123,104,238,.4); }
+  .save-btn:active { transform: translateY(0); }
+
+  /* NOTES FIELD */
+  .field textarea {
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    color: var(--white);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 70px;
+    outline: none;
+    transition: all .2s;
+  }
+  .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(123,104,238,.15); }
+
+  /* STREAK DISPLAY */
+  .streaks-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .streak-card {
+    flex: 1;
+    min-width: 120px;
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 14px 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .streak-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+  .streak-card.fire::before { background: var(--gold); }
+  .streak-num {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--gold);
+    line-height: 1;
+    font-family: 'Space Mono', monospace;
+  }
+  .streak-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  /* WEEKLY TABLE */
+  .week-table { width: 100%; border-collapse: collapse; }
+  .week-table th {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--divider);
+  }
+  .week-table td {
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(42,42,69,.5);
+    transition: background .2s;
+  }
+  .week-table tr:hover td { background: rgba(123,104,238,.05); }
+  .week-table tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .badge-t { background: rgba(80,250,123,.15); color: var(--green); }
+  .badge-n { background: rgba(255,85,85,.15); color: var(--red); }
+  .badge-num { background: rgba(123,104,238,.15); color: var(--accent2); }
+  .day-label { font-weight: 700; color: var(--accent2); font-family: 'Space Mono', monospace; font-size: 11px; }
+  .weekend-row td { background: rgba(123,104,238,.04); }
+  .today-row td { background: rgba(123,104,238,.1) !important; }
+  .today-row td:first-child { color: var(--accent3); font-weight: 800; }
+
+  /* STATS GRID */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.purple::before { background: var(--accent); }
+  .stat-card.gold::before { background: var(--gold); }
+  .stat-card.green::before { background: var(--green); }
+  .stat-card.cyan::before { background: var(--cyan); }
+  .stat-val {
+    font-size: 26px;
+    font-weight: 800;
+    font-family: 'Space Mono', monospace;
+    color: var(--white);
+    line-height: 1;
+  }
+  .stat-val.green { color: var(--green); }
+  .stat-val.gold { color: var(--gold); }
+  .stat-val.cyan { color: var(--cyan); }
+  .stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-top: 6px;
+    text-transform: uppercase;
+  }
+
+  /* CHART */
+  .chart-wrap { position: relative; height: 180px; margin: 10px 0; }
+  canvas { width: 100% !important; }
+
+  /* MONTH SELECTOR */
+  .month-select-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .month-select-row select {
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    color: var(--white);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* GOALS */
+  .goals-list { display: flex; flex-direction: column; gap: 10px; }
+  .goal-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: border-color .2s;
+  }
+  .goal-item:hover { border-color: var(--accent); }
+  .goal-icon { font-size: 20px; flex-shrink: 0; }
+  .goal-content { flex: 1; }
+  .goal-name { font-weight: 700; font-size: 14px; }
+  .goal-detail {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .goal-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent3);
+    background: rgba(123,104,238,.15);
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--accent);
+    color: white;
+    padding: 14px 28px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 14px;
+    z-index: 1000;
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    box-shadow: 0 8px 30px rgba(123,104,238,.5);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* PROGRESS BAR */
+  .progress-wrap { margin-top: 8px; }
+  .progress-bar {
+    height: 4px;
+    background: var(--divider);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+    transition: width .5s ease;
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .streaks-row { flex-direction: row; }
+    .card { padding: 16px; }
+    .week-table { font-size: 11px; }
+    .week-table th, .week-table td { padding: 7px 5px; }
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg1); }
+  ::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  select option { background: var(--bg2); }
+
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--divider), transparent);
+    margin: 8px 0 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-glow"></div>
+  <div class="header-inner">
+    <div class="header-top">
+      <h1>🏆 LIFE GRIND</h1>
+      <div id="authArea" style="margin-left:auto;display:flex;align-items:center;gap:12px"></div>
+    </div>
+    <div class="header-sub">184cm • 74kg → 80kg • 2950 kcal/dzień • 12 treningów/miesiąc • screen &lt;3h</div>
+  </div>
+</header>
+
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:rgba(8,8,16,.97);z-index:1000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px">
+  <div style="font-family:'Space Mono',monospace;font-size:11px;color:#6272a4;letter-spacing:2px;text-transform:uppercase">Zaloguj się aby zsynchronizować dane</div>
+  <h2 style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:#bd93f9">🏆 Life Grind Tracker</h2>
+  <button id="googleLoginBtn" style="display:flex;align-items:center;gap:12px;background:#fff;color:#111;border:none;padding:14px 28px;border-radius:10px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:transform .2s;box-shadow:0 4px 20px rgba(0,0,0,.4)" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+    <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-3.59-13.46-8.83l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+    Zaloguj przez Google
+  </button>
+  <div id="loginStatus" style="font-family:'Space Mono',monospace;font-size:10px;color:#6272a4"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('dziennik', this)">📅 Dziennik</button>
+  <button class="tab" onclick="switchTab('tygodnik', this)">📊 Tygodnik</button>
+  <button class="tab" onclick="switchTab('miesiac', this)">📋 Miesiąc</button>
+  <button class="tab" onclick="switchTab('wykresy', this)">📈 Wykresy</button>
+  <button class="tab" onclick="switchTab('cele', this)">🎯 Cele</button>
+  <button class="tab" onclick="switchTab('kalendarz', this)">🗓️ Kalendarz</button>
+</div>
+
+<div class="container">
+
+<!-- ══════════════ DZIENNIK ══════════════ -->
+<div id="panel-dziennik" class="panel active">
+  <div class="card">
+    <div class="date-header">
+      <div class="date-display" id="dateDisplay"></div>
+      <div class="date-nav">
+        <button onclick="changeDay(-1)">‹</button>
+        <button class="today-btn" onclick="goToday()">DZIŚ</button>
+        <button onclick="changeDay(1)">›</button>
+      </div>
+    </div>
+
+    <div class="streaks-row" id="streaksRow"></div>
+
+    <div class="card-title">💪 ZDROWIE</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Trening</label>
+        <div class="toggle-group" id="toggle-trening">
+          <button class="toggle-btn" onclick="setToggle('trening','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('trening','N',this)">N</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Kcal</label>
+        <input type="number" id="field-kcal" placeholder="2950">
+      </div>
+      <div class="field">
+        <label>Woda (ml)</label>
+        <input type="number" id="field-woda" placeholder="2000">
+      </div>
+      <div class="field">
+        <label>Zimny prysznic</label>
+        <div class="toggle-group" id="toggle-prysznic">
+          <button class="toggle-btn" onclick="setToggle('prysznic','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('prysznic','N',this)">N</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Alkohol</label>
+        <div class="toggle-group" id="toggle-alkohol">
+          <button class="toggle-btn" onclick="setToggle('alkohol','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('alkohol','N',this)">N</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="card-title">📚 NAUKA</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Licencjat</label>
+        <div class="toggle-group" id="toggle-licencjat">
+          <button class="toggle-btn" onclick="setToggle('licencjat','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('licencjat','N',this)">N</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Nauka</label>
+        <div class="toggle-group" id="toggle-nauka">
+          <button class="toggle-btn" onclick="setToggle('nauka','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('nauka','N',this)">N</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Czytanie (min)</label>
+        <input type="number" id="field-czytanie" placeholder="0">
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="card-title">❤️ MENTAL & SOCIAL</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Nastrój (1-10)</label>
+        <input type="number" id="field-nastoj" min="1" max="10" placeholder="7">
+      </div>
+      <div class="field">
+        <label>Energia (1-10)</label>
+        <input type="number" id="field-energia" min="1" max="10" placeholder="7">
+      </div>
+      <div class="field">
+        <label>Stres (1-10)</label>
+        <input type="number" id="field-stres" min="1" max="10" placeholder="5">
+      </div>
+      <div class="field">
+        <label>Leki</label>
+        <div class="toggle-group" id="toggle-leki">
+          <button class="toggle-btn" onclick="setToggle('leki','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('leki','N',this)">N</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Kontakt z ludźmi</label>
+        <div class="toggle-group" id="toggle-ludzie">
+          <button class="toggle-btn" onclick="setToggle('ludzie','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('ludzie','N',this)">N</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Masturbacja</label>
+        <div class="toggle-group" id="toggle-masturbacja">
+          <button class="toggle-btn" onclick="setToggle('masturbacja','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('masturbacja','N',this)">N</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Screen &lt;3h</label>
+        <div class="toggle-group" id="toggle-screen">
+          <button class="toggle-btn" onclick="setToggle('screen','T',this)">T</button>
+          <button class="toggle-btn" onclick="setToggle('screen','N',this)">N</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="card-title">💰 PRACA & WAGA</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Praca (godz)</label>
+        <input type="number" id="field-praca" step="0.5" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Zarobek (zł)</label>
+        <input type="number" id="field-zarobek" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Waga (kg)</label>
+        <input type="number" id="field-waga" step="0.1" placeholder="74.0">
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <div class="field">
+        <label>Notatka / wdzięczność</label>
+        <textarea id="field-notatka" placeholder="Co dziś poszło dobrze? Za co jesteś wdzięczny?"></textarea>
+      </div>
+    </div>
+
+    <button class="save-btn" onclick="saveDay()">💾 Zapisz dzień</button>
+  </div>
+</div>
+
+<!-- ══════════════ TYGODNIK ══════════════ -->
+<div id="panel-tygodnik" class="panel">
+  <div class="card">
+    <div class="card-title">📊 OSTATNIE 7 DNI</div>
+    <div class="stats-grid" id="weekStats"></div>
+    <div class="section-divider"></div>
+    <div style="overflow-x:auto">
+      <table class="week-table" id="weekTable">
+        <thead>
+          <tr>
+            <th>Dzień</th><th>Trening</th><th>Kcal</th><th>Nauka</th>
+            <th>Nastrój</th><th>Energia</th><th>Waga</th><th>Zarobek</th>
+          </tr>
+        </thead>
+        <tbody id="weekBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MIESIĄC ══════════════ -->
+<div id="panel-miesiac" class="panel">
+  <div class="card">
+    <div class="month-select-row">
+      <div class="card-title" style="margin:0">📋 PODSUMOWANIE</div>
+      <select id="monthSelect" onchange="renderMonth()"></select>
+    </div>
+    <div class="stats-grid" id="monthStats"></div>
+    <div class="section-divider"></div>
+    <div class="progress-wrap" id="monthProgress"></div>
+  </div>
+</div>
+
+<!-- ══════════════ WYKRESY ══════════════ -->
+<div id="panel-wykresy" class="panel">
+  <div class="card">
+    <div class="card-title">⚖️ WAGA — DROGA DO 80KG</div>
+    <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🔥 KCAL — OSTATNIE 14 DNI</div>
+    <div class="chart-wrap"><canvas id="kcalChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">❤️ NASTRÓJ & ENERGIA — OSTATNIE 14 DNI</div>
+    <div class="chart-wrap"><canvas id="moodChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ══════════════ CELE ══════════════ -->
+<div id="panel-cele" class="panel">
+  <div class="card">
+    <div class="card-title">🎯 MOJE CELE</div>
+    <div class="goals-list">
+      <div class="goal-item"><div class="goal-icon">💪</div><div class="goal-content"><div class="goal-name">Waga docelowa</div><div class="goal-detail">Wakacje 2025</div></div><div class="goal-badge">74 → 80 kg</div></div>
+      <div class="goal-item"><div class="goal-icon">🏋️</div><div class="goal-content"><div class="goal-name">Treningi</div><div class="goal-detail">3x tygodniowo</div></div><div class="goal-badge">12 / miesiąc</div></div>
+      <div class="goal-item"><div class="goal-icon">🍽️</div><div class="goal-content"><div class="goal-name">Kalorie dziennie</div><div class="goal-detail">Nadwyżka na masę</div></div><div class="goal-badge">2950 kcal</div></div>
+      <div class="goal-item"><div class="goal-icon">🥩</div><div class="goal-content"><div class="goal-name">Białko dziennie</div><div class="goal-detail">2g / kg masy</div></div><div class="goal-badge">148g+</div></div>
+      <div class="goal-item"><div class="goal-icon">🛡️</div><div class="goal-content"><div class="goal-name">Certyfikat wejściowy</div><div class="goal-detail">Cybersecurity</div></div><div class="goal-badge">CompTIA Sec+</div></div>
+      <div class="goal-item"><div class="goal-icon">💼</div><div class="goal-content"><div class="goal-name">Cel zawodowy</div><div class="goal-detail">Long-term</div></div><div class="goal-badge">Praca w SOC</div></div>
+      <div class="goal-item"><div class="goal-icon">📵</div><div class="goal-content"><div class="goal-name">Screen time</div><div class="goal-detail">Codziennie</div></div><div class="goal-badge">&lt; 3h</div></div>
+      <div class="goal-item"><div class="goal-icon">🌱</div><div class="goal-content"><div class="goal-name">Mental</div><div class="goal-detail">W toku</div></div><div class="goal-badge">Miłość do siebie</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ KALENDARZ ══════════════ -->
+<div id="panel-kalendarz" class="panel">
+  <div class="card">
+    <div class="month-select-row">
+      <div class="card-title" style="margin:0">🗓️ KALENDARZ STREAKA</div>
+      <select id="calMonthSelect" onchange="renderCalendar()"></select>
+    </div>
+
+    <!-- Streak legend -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">
+      <span><span style="display:inline-block;width:12px;height:12px;background:var(--accent);border-radius:3px;vertical-align:middle;margin-right:5px"></span>Trening</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:var(--cyan);border-radius:3px;vertical-align:middle;margin-right:5px"></span>Nauka</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:var(--green);border-radius:3px;vertical-align:middle;margin-right:5px"></span>Czytanie</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:rgba(255,215,0,.3);border:1px solid var(--gold);border-radius:3px;vertical-align:middle;margin-right:5px"></span>Dziś</span>
+    </div>
+
+    <!-- Streak summary row -->
+    <div id="calStreakSummary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px"></div>
+
+    <!-- Calendar grid -->
+    <div id="calGrid"></div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="toast" id="toast">✓ Zapisano!</div>
+
+<style>
+/* ── CALENDAR STYLES ── */
+.cal-month { margin-bottom: 8px; }
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.cal-weekday {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  text-align: center;
+  padding: 4px 0;
+  letter-spacing: 1px;
+}
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-day {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--divider);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: border-color .15s, transform .15s;
+  min-height: 52px;
+  overflow: hidden;
+}
+.cal-day:hover { border-color: var(--accent2); transform: scale(1.03); }
+.cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+.cal-day.empty:hover { transform: none; }
+.cal-day.today {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 10px rgba(255,215,0,.2);
+}
+.cal-day.weekend { background: rgba(123,104,238,.06); }
+.cal-day-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 1;
+  z-index: 1;
+}
+.cal-day.today .cal-day-num { color: var(--gold); }
+.cal-day.has-data .cal-day-num { color: var(--white); }
+
+/* Streak dots row */
+.cal-dots {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  z-index: 1;
+}
+.cal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  opacity: .85;
+}
+.cal-dot.trening { background: var(--accent); }
+.cal-dot.nauka   { background: var(--cyan); }
+.cal-dot.czytanie { background: var(--green); }
+.cal-dot.off { background: var(--divider); }
+
+/* Streak chain connector — horizontal line between consecutive days */
+.cal-day.streak-trening::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 3px;
+  background: var(--accent);
+  z-index: 2;
+}
+.cal-day.streak-trening-end::after { display: none; }
+
+/* Background fill for active days */
+.cal-day.active-trening { background: rgba(123,104,238,.18); border-color: rgba(123,104,238,.4); }
+.cal-day.active-all { background: rgba(80,250,123,.1); border-color: rgba(80,250,123,.3); }
+
+/* Mood color overlay */
+.cal-mood-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Streak counter badge */
+.cal-streak-badge {
+  position: absolute;
+  top: 3px; right: 3px;
+  font-family: 'Space Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+}
+
+@media (max-width: 500px) {
+  .cal-day { min-height: 42px; border-radius: 6px; }
+  .cal-day-num { font-size: 10px; }
+  .cal-dot { width: 5px; height: 5px; }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAGmT8U5eVhWMIfwh4r7Mbx8OSqpCzUVN0",
+  authDomain: "life-grind-tracker.firebaseapp.com",
+  projectId: "life-grind-tracker",
+  storageBucket: "life-grind-tracker.firebasestorage.app",
+  messagingSenderId: "582997055141",
+  appId: "1:582997055141:web:8b5cc0b65a7b1d8fae5f4c"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let currentUser = null;
+let localCache = {};
+let currentDate = new Date();
+currentDate.setHours(0,0,0,0);
+const toggleState = {};
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getData() { return localCache; }
+function getDayData(d) { return localCache[dateKey(d)] || {}; }
+
+async function saveAllData() {
+  if (currentUser) {
+    try { await setDoc(doc(db,'users',currentUser.uid,'data','days'), localCache); }
+    catch(e) { localStorage.setItem('lifeGrind_v1', JSON.stringify(localCache)); }
+  } else {
+    localStorage.setItem('lifeGrind_v1', JSON.stringify(localCache));
+  }
+}
+function saveDayData(d, obj) {
+  localCache[dateKey(d)] = obj;
+  saveAllData();
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+const overlay = document.getElementById('loginOverlay');
+const authArea = document.getElementById('authArea');
+
+document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+  document.getElementById('loginStatus').textContent = 'Łączenie...';
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch(e) {
+    document.getElementById('loginStatus').textContent = 'Błąd: ' + e.message;
+  }
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    currentUser = user;
+    overlay.style.display = 'none';
+    authArea.innerHTML = `
+      <span style="font-family:'Space Mono',monospace;font-size:10px;color:#6272a4">${user.email}</span>
+      <button id="signOutBtn" style="font-family:'Space Mono',monospace;font-size:9px;background:transparent;border:1px solid #2a2a45;color:#6272a4;padding:6px 12px;border-radius:6px;cursor:pointer">WYLOGUJ</button>
+    `;
+    document.getElementById('signOutBtn').onclick = () => signOut(auth);
+    // Load from Firebase
+    try {
+      const local = JSON.parse(localStorage.getItem('lifeGrind_v1') || '{}');
+      const snap = await getDoc(doc(db,'users',user.uid,'data','days'));
+      const remote = snap.exists() ? snap.data() : {};
+      localCache = {...remote, ...local};
+      if (Object.keys(local).length > 0) {
+        await setDoc(doc(db,'users',user.uid,'data','days'), localCache);
+        localStorage.removeItem('lifeGrind_v1');
+        showToast('✓ Dane zsynchronizowane!');
+      }
+    } catch(e) {
+      localCache = JSON.parse(localStorage.getItem('lifeGrind_v1') || '{}');
+    }
+    buildMonthSelect();
+    buildCalMonthSelect();
+    loadDayPanel();
+  } else {
+    currentUser = null;
+    localCache = JSON.parse(localStorage.getItem('lifeGrind_v1') || '{}');
+    overlay.style.display = 'flex';
+    authArea.innerHTML = '';
+  }
+});
+
+// ── TOGGLES ───────────────────────────────────────────────────────────────────
+window.setToggle = function(name, val, btn) {
+  toggleState[name] = val;
+  const grp = document.getElementById('toggle-' + name);
+  grp.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active-yes','active-no'));
+  btn.classList.add(val === 'T' ? 'active-yes' : 'active-no');
+};
+
+function resetToggles() {
+  ['trening','prysznic','alkohol','licencjat','nauka','leki','ludzie','masturbacja','screen'].forEach(n => {
+    toggleState[n] = null;
+    const grp = document.getElementById('toggle-' + n);
+    if (grp) grp.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active-yes','active-no'));
+  });
+}
+function loadToggles(day) {
+  resetToggles();
+  ['trening','prysznic','alkohol','licencjat','nauka','leki','ludzie','masturbacja','screen'].forEach(n => {
+    if (!day[n]) return;
+    toggleState[n] = day[n];
+    const grp = document.getElementById('toggle-' + n);
+    if (!grp) return;
+    grp.querySelectorAll('.toggle-btn').forEach(b => {
+      if (b.textContent === day[n]) b.classList.add(day[n]==='T' ? 'active-yes' : 'active-no');
+    });
+  });
+}
+
+// ── DATE ──────────────────────────────────────────────────────────────────────
+const DAYS = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
+const MONTHS_GEN = ['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+const MONTHS_NOM = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+
+function updateDateDisplay() {
+  const d = currentDate;
+  const isToday = dateKey(d) === dateKey(new Date());
+  document.getElementById('dateDisplay').innerHTML =
+    `<span>${DAYS[d.getDay()]}</span>, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}${isToday?' <span style="color:var(--green);font-size:13px">• DZIŚ</span>':''}`;
+}
+
+window.changeDay = function(delta) {
+  currentDate = new Date(currentDate);
+  currentDate.setDate(currentDate.getDate() + delta);
+  loadDayPanel();
+};
+window.goToday = function() {
+  currentDate = new Date(); currentDate.setHours(0,0,0,0);
+  loadDayPanel();
+};
+
+// ── STREAKS ───────────────────────────────────────────────────────────────────
+function calcStreak(key) {
+  let streak = 0, d = new Date(); d.setHours(0,0,0,0);
+  for (let i = 0; i < 365; i++) {
+    const day = localCache[dateKey(d)];
+    if (!day) break;
+    const hit = key==='czytanie' ? parseInt(day[key])>0 : day[key]==='T';
+    if (hit) streak++; else break;
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
+}
+function renderStreaks() {
+  document.getElementById('streaksRow').innerHTML = [
+    {key:'trening',label:'Trening',icon:'🏋️'},
+    {key:'nauka',label:'Nauka',icon:'📚'},
+    {key:'czytanie',label:'Czytanie',icon:'📖'},
+  ].map(s => `<div class="streak-card fire"><div class="streak-num">${calcStreak(s.key)}</div><div class="streak-label">${s.icon} ${s.label} Streak</div></div>`).join('');
+}
+
+// ── DZIENNIK ──────────────────────────────────────────────────────────────────
+function loadDayPanel() {
+  updateDateDisplay();
+  renderStreaks();
+  const day = getDayData(currentDate);
+  ['kcal','woda','czytanie','nastoj','energia','stres','praca','zarobek','waga','notatka'].forEach(f => {
+    const el = document.getElementById('field-'+f);
+    if (el) el.value = day[f] || '';
+  });
+  loadToggles(day);
+}
+
+window.saveDay = function() {
+  const obj = {};
+  ['kcal','woda','czytanie','nastoj','energia','stres','praca','zarobek','waga','notatka'].forEach(f => {
+    const el = document.getElementById('field-'+f);
+    if (el && el.value !== '') obj[f] = el.value;
+  });
+  Object.assign(obj, toggleState);
+  saveDayData(currentDate, obj);
+  showToast('✓ Zapisano!');
+  renderStreaks();
+  if (document.getElementById('panel-wykresy').classList.contains('active')) renderCharts();
+};
+
+// ── TYGODNIK ──────────────────────────────────────────────────────────────────
+function renderWeek() {
+  let rows=[], totalT=0, totalK=0, kDays=0, totalE=0, mSum=0, mDays=0;
+  for (let i=6; i>=0; i--) {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
+    const day = localCache[dateKey(d)] || {};
+    const isToday = i===0, isWE = d.getDay()===0||d.getDay()===6;
+    if (day.trening==='T') totalT++;
+    if (day.kcal) { totalK+=parseFloat(day.kcal); kDays++; }
+    if (day.zarobek) totalE+=parseFloat(day.zarobek);
+    if (day.nastoj) { mSum+=parseFloat(day.nastoj); mDays++; }
+    rows.push(`<tr class="${isToday?'today-row':isWE?'weekend-row':''}">
+      <td class="day-label">${DAYS[d.getDay()].slice(0,2)} ${d.getDate()}.${String(d.getMonth()+1).padStart(2,'0')}</td>
+      <td>${day.trening?`<span class="badge badge-${day.trening==='T'?'t':'n'}">${day.trening}</span>`:'–'}</td>
+      <td>${day.kcal?`<span class="badge badge-num">${day.kcal}</span>`:'–'}</td>
+      <td>${day.nauka?`<span class="badge badge-${day.nauka==='T'?'t':'n'}">${day.nauka}</span>`:'–'}</td>
+      <td>${day.nastoj?`<span class="badge badge-num">${day.nastoj}/10</span>`:'–'}</td>
+      <td>${day.energia?`<span class="badge badge-num">${day.energia}/10</span>`:'–'}</td>
+      <td>${day.waga?`<span class="badge badge-num">${day.waga} kg</span>`:'–'}</td>
+      <td>${day.zarobek?`<span class="badge badge-num">${day.zarobek} zł</span>`:'–'}</td>
+    </tr>`);
+  }
+  document.getElementById('weekBody').innerHTML = rows.join('');
+  document.getElementById('weekStats').innerHTML = `
+    <div class="stat-card purple"><div class="stat-val">${totalT}/7</div><div class="stat-label">Treningi</div></div>
+    <div class="stat-card gold"><div class="stat-val gold">${kDays?Math.round(totalK/kDays):'–'}</div><div class="stat-label">Śr. kcal</div></div>
+    <div class="stat-card green"><div class="stat-val green">${mDays?(mSum/mDays).toFixed(1):'–'}</div><div class="stat-label">Śr. nastrój</div></div>
+    <div class="stat-card cyan"><div class="stat-val cyan">${totalE?totalE+' zł':'–'}</div><div class="stat-label">Zarobek</div></div>`;
+}
+
+// ── MIESIĘCZNIK ───────────────────────────────────────────────────────────────
+function buildMonthSelect() {
+  const sel = document.getElementById('monthSelect');
+  if (!sel) return;
+  const now = new Date(); sel.innerHTML='';
+  for (let i=2; i>=-1; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const opt = document.createElement('option');
+    opt.value = `${d.getFullYear()}-${d.getMonth()}`;
+    opt.textContent = `${MONTHS_NOM[d.getMonth()]} ${d.getFullYear()}`;
+    if (i===0) opt.selected=true;
+    sel.appendChild(opt);
+  }
+}
+window.renderMonth = function() {
+  const [year,month] = document.getElementById('monthSelect').value.split('-').map(Number);
+  const dim = new Date(year,month+1,0).getDate();
+  let tr=0,ks=0,kd=0,ms=0,md=0,earn=0,maxStr=0,cur=0;
+  for (let d=1; d<=dim; d++) {
+    const day = localCache[dateKey(new Date(year,month,d))] || {};
+    if (day.trening==='T'){tr++;cur++;maxStr=Math.max(maxStr,cur);}else cur=0;
+    if (day.kcal){ks+=parseFloat(day.kcal);kd++;}
+    if (day.nastoj){ms+=parseFloat(day.nastoj);md++;}
+    if (day.zarobek) earn+=parseFloat(day.zarobek);
+  }
+  const pct=Math.round(tr/12*100);
+  document.getElementById('monthStats').innerHTML=`
+    <div class="stat-card purple"><div class="stat-val">${tr}/12</div><div class="stat-label">Treningi</div></div>
+    <div class="stat-card gold"><div class="stat-val gold">${kd?Math.round(ks/kd):'–'}</div><div class="stat-label">Śr. kcal</div></div>
+    <div class="stat-card green"><div class="stat-val green">${md?(ms/md).toFixed(1):'–'}</div><div class="stat-label">Śr. nastrój</div></div>
+    <div class="stat-card cyan"><div class="stat-val cyan">${earn?earn+' zł':'–'}</div><div class="stat-label">Zarobek</div></div>
+    <div class="stat-card gold"><div class="stat-val gold">${maxStr}</div><div class="stat-label">Max streak</div></div>
+    <div class="stat-card purple"><div class="stat-val">${pct}%</div><div class="stat-label">Cel treningów</div></div>`;
+  document.getElementById('monthProgress').innerHTML=`
+    <div class="progress-label"><span>Treningi: ${tr}/12</span><span>${pct}%</span></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(pct,100)}%"></div></div>
+    <div class="progress-label" style="margin-top:10px"><span>Kcal śr. vs cel 2950</span><span>${kd?Math.round(ks/kd):'–'}/2950</span></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${kd?Math.min(Math.round(ks/kd)/2950*100,100):0}%;background:linear-gradient(90deg,var(--gold),var(--orange))"></div></div>`;
+};
+
+// ── WYKRESY ───────────────────────────────────────────────────────────────────
+let charts = {};
+function renderCharts() {
+  const labels14=[],kcalV=[],moodV=[],energyV=[];
+  for (let i=13; i>=0; i--) {
+    const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
+    const day=localCache[dateKey(d)]||{};
+    labels14.push(`${d.getDate()}.${String(d.getMonth()+1).padStart(2,'0')}`);
+    kcalV.push(day.kcal?parseFloat(day.kcal):null);
+    moodV.push(day.nastoj?parseFloat(day.nastoj):null);
+    energyV.push(day.energia?parseFloat(day.energia):null);
+  }
+  const wlabels=[],wvals=[];
+  for (let i=12; i>=0; i--) {
+    const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i*7);
+    wlabels.push(`Tydz. ${13-i}`);
+    wvals.push((localCache[dateKey(d)]||{}).waga?parseFloat(localCache[dateKey(d)].waga):null);
+  }
+  const base={responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#6272a4',font:{family:'Space Mono',size:10}}}},
+    scales:{x:{grid:{color:'rgba(42,42,69,.5)'},ticks:{color:'#6272a4',font:{family:'Space Mono',size:9}}},
+            y:{grid:{color:'rgba(42,42,69,.5)'},ticks:{color:'#6272a4',font:{family:'Space Mono',size:9}}}}};
+  if(charts.w) charts.w.destroy();
+  charts.w=new Chart(document.getElementById('weightChart'),{type:'line',data:{labels:wlabels,datasets:[
+    {label:'Waga (kg)',data:wvals,borderColor:'#7b68ee',backgroundColor:'rgba(123,104,238,.1)',borderWidth:2,pointRadius:4,tension:.3,spanGaps:true},
+    {label:'Cel (80kg)',data:Array(13).fill(80),borderColor:'#50fa7b',borderDash:[6,3],borderWidth:1.5,pointRadius:0}
+  ]},options:{...base,scales:{...base.scales,y:{...base.scales.y,min:72,max:82}}}});
+  if(charts.k) charts.k.destroy();
+  charts.k=new Chart(document.getElementById('kcalChart'),{type:'bar',data:{labels:labels14,datasets:[
+    {label:'Twoje kcal',data:kcalV,backgroundColor:'rgba(123,104,238,.7)',borderRadius:4},
+    {label:'Cel (2950)',data:Array(14).fill(2950),type:'line',borderColor:'#50fa7b',borderDash:[6,3],borderWidth:1.5,pointRadius:0}
+  ]},options:base});
+  if(charts.m) charts.m.destroy();
+  charts.m=new Chart(document.getElementById('moodChart'),{type:'line',data:{labels:labels14,datasets:[
+    {label:'Nastrój',data:moodV,borderColor:'#bd93f9',backgroundColor:'rgba(189,147,249,.1)',borderWidth:2,pointRadius:3,tension:.3,spanGaps:true},
+    {label:'Energia',data:energyV,borderColor:'#8be9fd',backgroundColor:'rgba(139,233,253,.05)',borderWidth:2,pointRadius:3,tension:.3,spanGaps:true}
+  ]},options:{...base,scales:{...base.scales,y:{...base.scales.y,min:0,max:10}}}});
+}
+
+// ── KALENDARZ ─────────────────────────────────────────────────────────────────
+function buildCalMonthSelect() {
+  const sel = document.getElementById('calMonthSelect');
+  if (!sel) return;
+  const now = new Date(); sel.innerHTML='';
+  for (let i=2; i>=-1; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const opt = document.createElement('option');
+    opt.value=`${d.getFullYear()}-${d.getMonth()}`;
+    opt.textContent=`${MONTHS_NOM[d.getMonth()]} ${d.getFullYear()}`;
+    if(i===0) opt.selected=true;
+    sel.appendChild(opt);
+  }
+}
+window.renderCalendar = function() {
+  const sel=document.getElementById('calMonthSelect'); if(!sel) return;
+  const [year,month]=sel.value.split('-').map(Number);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const todayKey=dateKey(today);
+  const firstDay=new Date(year,month,1);
+  const dim=new Date(year,month+1,0).getDate();
+  let off=firstDay.getDay()-1; if(off<0) off=6;
+
+  let curStr={trening:0,nauka:0,czytanie:0};
+  const strs={trening:[],nauka:[],czytanie:[]};
+  const jan1=new Date(year,0,1);
+  for(let i=0;;i++){
+    const d=new Date(jan1); d.setDate(d.getDate()+i);
+    if(d>new Date(year,month,dim)) break;
+    const day=localCache[dateKey(d)]||{};
+    curStr.trening=day.trening==='T'?curStr.trening+1:0;
+    curStr.nauka=day.nauka==='T'?curStr.nauka+1:0;
+    curStr.czytanie=parseInt(day.czytanie)>0?curStr.czytanie+1:0;
+    if(d.getMonth()===month){strs.trening.push(curStr.trening);strs.nauka.push(curStr.nauka);strs.czytanie.push(curStr.czytanie);}
+  }
+
+  let tCount=0;
+  for(let d=1;d<=dim;d++){if((localCache[dateKey(new Date(year,month,d))]||{}).trening==='T') tCount++;}
+  const mxT=Math.max(0,...strs.trening), mxN=Math.max(0,...strs.nauka), mxC=Math.max(0,...strs.czytanie);
+
+  document.getElementById('calStreakSummary').innerHTML=`
+    <div class="streak-card" style="min-width:110px"><div class="streak-num" style="color:var(--accent)">${mxT}</div><div class="streak-label">🏋️ max streak</div></div>
+    <div class="streak-card" style="min-width:110px"><div class="streak-num" style="color:var(--cyan)">${mxN}</div><div class="streak-label">📚 max streak</div></div>
+    <div class="streak-card" style="min-width:110px"><div class="streak-num" style="color:var(--green)">${mxC}</div><div class="streak-label">📖 max streak</div></div>
+    <div class="streak-card" style="min-width:110px"><div class="streak-num">${tCount}</div><div class="streak-label">🏋️ treningi</div></div>`;
+
+  const wd=['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
+  let html=`<div class="cal-weekdays">${wd.map(w=>`<div class="cal-weekday">${w}</div>`).join('')}</div><div class="cal-days">`;
+  for(let i=0;i<off;i++) html+=`<div class="cal-day empty"></div>`;
+
+  for(let d=1;d<=dim;d++){
+    const dt=new Date(year,month,d), k=dateKey(dt);
+    const day=localCache[k]||{};
+    const isToday=k===todayKey, isWE=dt.getDay()===0||dt.getDay()===6;
+    const idx=d-1;
+    const tOn=day.trening==='T', nOn=day.nauka==='T', cOn=parseInt(day.czytanie)>0;
+    const hasData=tOn||nOn||cOn||day.kcal||day.nastoj;
+    const nextDay=localCache[dateKey(new Date(year,month,d+1))]||{};
+    const isLastInRow=((off+d-1)%7)===6;
+    let cls='cal-day';
+    if(isToday) cls+=' today';
+    if(isWE) cls+=' weekend';
+    if(tOn&&nOn&&cOn) cls+=' active-all';
+    else if(tOn) cls+=' active-trening';
+    if(hasData) cls+=' has-data';
+    if(tOn&&nextDay.trening==='T'&&!isLastInRow&&d<dim) cls+=' streak-trening';
+    const mood=day.nastoj?['#ff5555','#ff5555','#ff5555','#ffb86c','#ffb86c','#f1fa8c','#f1fa8c','#50fa7b','#50fa7b','#50fa7b'][parseInt(day.nastoj)-1]:null;
+    const tStr=strs.trening[idx];
+    html+=`<div class="${cls}" onclick="calClick('${k}')">
+      ${tStr>1?`<div class="cal-streak-badge">${tStr}</div>`:''}
+      <div class="cal-day-num">${d}</div>
+      <div class="cal-dots">
+        <div class="cal-dot ${tOn?'trening':'off'}"></div>
+        <div class="cal-dot ${nOn?'nauka':'off'}"></div>
+        <div class="cal-dot ${cOn?'czytanie':'off'}"></div>
+      </div>
+      ${mood?`<div class="cal-mood-bar" style="background:${mood}"></div>`:''}
+    </div>`;
+  }
+  const rem=(off+dim)%7; if(rem>0) for(let i=0;i<7-rem;i++) html+=`<div class="cal-day empty"></div>`;
+  html+='</div>';
+  document.getElementById('calGrid').innerHTML=html;
+};
+
+window.calClick = function(key) {
+  const [y,m,d]=key.split('-').map(Number);
+  currentDate=new Date(y,m-1,d);
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-dziennik').classList.add('active');
+  document.querySelectorAll('.tab')[0].classList.add('active');
+  loadDayPanel();
+};
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+window.switchTab = function(name, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='tygodnik') renderWeek();
+  if(name==='miesiac') renderMonth();
+  if(name==='wykresy') renderCharts();
+  if(name==='kalendarz') renderCalendar();
+};
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>
