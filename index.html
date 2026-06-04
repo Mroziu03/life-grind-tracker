@@ -1345,6 +1345,7 @@ window.saveDay = function() {
   saveDayData(currentDate, obj);
   showToast('✓ Zapisano!');
   renderStreaks();
+  sendSettingsToSW(); // inform SW diary is now filled
   if (document.getElementById('panel-wykresy').classList.contains('active')) renderCharts();
 };
 
@@ -1844,53 +1845,86 @@ document.addEventListener('click', e => {
 
 // ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
 const NOTIF_KEY = 'lifeGrind_notif';
-const loadNotifSettings = () => { try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || '{}'); } catch { return {}; } };
+const loadNotifSettings  = () => { try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || '{}'); } catch { return {}; } };
 const saveNotifSettingsData = s => localStorage.setItem(NOTIF_KEY, JSON.stringify(s));
+
+function isDiaryFilledToday() {
+  const d = localCache[dateKey(new Date())] || {};
+  return Object.keys(d).filter(k => k !== 'zadania').length > 0;
+}
+
+async function sendSettingsToSW() {
+  if (!('serviceWorker' in navigator)) return;
+  const reg = await navigator.serviceWorker.ready.catch(() => null);
+  if (!reg?.active) return;
+  const s = loadNotifSettings();
+  reg.active.postMessage({
+    type: 'NOTIF_SETTINGS',
+    settings: { ...s, diaryFilledToday: isDiaryFilledToday() },
+  });
+}
 
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  try { await navigator.serviceWorker.register('/sw.js'); } catch(e) {}
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+    // Listen for SW firing a notification — persist timestamp
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'NOTIF_FIRED') {
+        const s = loadNotifSettings();
+        s.lastNotifiedAt = e.data.ts;
+        saveNotifSettingsData(s);
+      }
+    });
+  } catch(e) {}
 }
 
 function updateNotifUI(s) {
-  const btn = document.getElementById('notifToggleBtn');
+  const btn    = document.getElementById('notifToggleBtn');
   const status = document.getElementById('notifStatus');
   if (!btn) return;
-  if (s.enabled && Notification.permission === 'granted') {
-    btn.textContent = '🔔 Włączone';
-    btn.style.cssText += ';background:rgba(80,250,123,.12);color:var(--green);border-color:rgba(80,250,123,.4)';
-    status.innerHTML = `Przypomnienie o <b style="color:var(--green)">${s.time||'20:00'}</b><br>Działa gdy przeglądarka jest otwarta`;
+  const on = s.enabled && Notification.permission === 'granted';
+  btn.textContent = on ? '🔔 Włączone' : '🔕 Wyłączone';
+  btn.style.background   = on ? 'rgba(80,250,123,.12)' : 'var(--bg3)';
+  btn.style.color        = on ? 'var(--green)'         : 'var(--muted)';
+  btn.style.borderColor  = on ? 'rgba(80,250,123,.4)'  : 'var(--divider)';
+  if (on) {
+    status.innerHTML = `Start o <b style="color:var(--green)">${s.time||'20:00'}</b> · powtarza co 15 min aż wpiszesz dziennik`;
+  } else if (Notification.permission === 'denied') {
+    status.innerHTML = `⚠ Zablokowane w Brave — zezwól ręcznie:<br>
+      <span style="color:var(--accent2)">🔒 (kłódka w pasku) → Powiadomienia → Zezwól</span>`;
   } else {
-    btn.textContent = '🔕 Wyłączone';
-    btn.style.cssText += ';background:var(--bg3);color:var(--muted);border-color:var(--divider)';
-    status.textContent = Notification.permission === 'denied'
-      ? '⚠ Zablokowane w przeglądarce — odblokuj ręcznie w ustawieniach'
-      : 'Kliknij żeby włączyć codzienny reminder';
+    status.textContent = 'Kliknij żeby włączyć codzienny reminder';
   }
 }
 
 window.toggleNotif = async function() {
-  if (!('Notification' in window)) { showToast('⚠ Przeglądarka nie obsługuje powiadomień'); return; }
+  if (!('Notification' in window)) { showToast('⚠ Brak wsparcia dla powiadomień'); return; }
   const s = loadNotifSettings();
   if (s.enabled) {
     s.enabled = false;
     saveNotifSettingsData(s);
     updateNotifUI(s);
+    sendSettingsToSW();
     return;
   }
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') { updateNotifUI(s); showToast('⚠ Brak zgody na powiadomienia'); return; }
+  if (perm !== 'granted') { updateNotifUI(s); showToast('⚠ Brak zgody — sprawdź ustawienia Brave'); return; }
   s.enabled = true;
   s.time = document.getElementById('notifTime').value || '20:00';
+  s.lastNotifiedAt = 0;
   saveNotifSettingsData(s);
   updateNotifUI(s);
+  sendSettingsToSW();
   showToast('🔔 Przypomnienie włączone!');
 };
 
 window.saveNotifTime = function() {
   const s = loadNotifSettings();
   s.time = document.getElementById('notifTime').value;
+  s.lastNotifiedAt = 0; // reset so it fires at new time
   saveNotifSettingsData(s);
+  sendSettingsToSW();
   if (s.enabled) showToast('✓ Godzina zapisana!');
 };
 
@@ -1899,25 +1933,7 @@ function initNotif() {
   const input = document.getElementById('notifTime');
   if (s.time && input) input.value = s.time;
   updateNotifUI(s);
-
-  setInterval(() => {
-    const settings = loadNotifSettings();
-    if (!settings.enabled || Notification.permission !== 'granted') return;
-    const now = new Date();
-    const [h, m] = (settings.time || '20:00').split(':').map(Number);
-    const today = dateKey(now);
-    if (now.getHours() === h && now.getMinutes() === m && settings.lastNotified !== today) {
-      settings.lastNotified = today;
-      saveNotifSettingsData(settings);
-      const dayData = localCache[today] || {};
-      const filled = Object.keys(dayData).filter(k => k !== 'zadania').length > 0;
-      navigator.serviceWorker.ready.then(reg => reg.showNotification('🏆 Life Grind Tracker', {
-        body: filled ? 'Masz niezapisane dane — uzupełnij dziennik! 📅' : 'Nie zapomnij uzupełnić dziennika na dziś! 📅',
-        tag: 'daily-reminder',
-        renotify: false,
-      }));
-    }
-  }, 60000);
+  sendSettingsToSW();
 }
 
 registerSW();
