@@ -609,6 +609,33 @@
   }
   .task-del:hover { color: var(--red); }
 
+  /* NOTIFICATIONS */
+  .notif-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .notif-toggle-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--divider);
+    background: var(--bg3);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .notif-status {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
   .goals-edit-hint {
     font-family: 'Space Mono', monospace;
     font-size: 9px;
@@ -898,25 +925,13 @@
   <!-- Notification settings card -->
   <div class="card" style="margin-top:12px;padding:16px 20px">
     <div class="card-title" style="margin-bottom:14px">🔔 PRZYPOMNIENIE DZIENNIKA</div>
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-      <button id="notifToggleBtn" onclick="toggleNotif()"
-        style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;padding:9px 16px;
-               border-radius:8px;border:1px solid var(--divider);background:var(--bg3);
-               color:var(--muted);cursor:pointer;transition:all .2s;white-space:nowrap">
-        🔕 Wyłączone
-      </button>
+    <div class="notif-row">
+      <button id="notifToggleBtn" class="notif-toggle-btn" onclick="toggleNotif()">🔕 Wyłączone</button>
       <div class="field" style="margin:0;min-width:130px">
         <label>Godzina</label>
         <input type="time" id="notifTime" value="20:00" onchange="saveNotifTime()">
       </div>
-      <button onclick="testNotif()"
-        style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:9px 14px;
-               border-radius:8px;border:1px solid var(--divider);background:var(--bg3);
-               color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .2s"
-        onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='var(--divider)'">
-        🧪 Test
-      </button>
-      <div id="notifStatus" style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);line-height:1.6"></div>
+      <div id="notifStatus" class="notif-status"></div>
     </div>
   </div>
 </div>
@@ -1892,14 +1907,14 @@ function updateNotifUI(s) {
   const status = document.getElementById('notifStatus');
   if (!btn) return;
   const on = s.enabled && Notification.permission === 'granted';
-  btn.textContent      = on ? '🔔 Włączone'         : '🔕 Wyłączone';
-  btn.style.background = on ? 'rgba(80,250,123,.12)' : 'var(--bg3)';
-  btn.style.color      = on ? 'var(--green)'         : 'var(--muted)';
-  btn.style.borderColor= on ? 'rgba(80,250,123,.4)'  : 'var(--divider)';
+  btn.textContent = on ? '🔔 Włączone' : '🔕 Wyłączone';
+  btn.style.cssText = on
+    ? 'background:rgba(80,250,123,.12);color:var(--green);border-color:rgba(80,250,123,.4)'
+    : 'background:var(--bg3);color:var(--muted);border-color:var(--divider)';
   status.innerHTML = on
     ? `Start o <b style="color:var(--green)">${s.time||'20:00'}</b> · co 15 min aż wpiszesz dziennik`
     : Notification.permission === 'denied'
-      ? `⚠ Zablokowane — kliknij 🔒 w pasku adresu → Powiadomienia → Zezwól`
+      ? '⚠ Zablokowane — kliknij 🔒 w pasku → Powiadomienia → Zezwól'
       : 'Kliknij żeby włączyć codzienny reminder';
 }
 
@@ -1924,43 +1939,6 @@ window.saveNotifTime = function() {
   s.lastNotifiedAt = 0;
   saveNotifSettingsData(s); sendSettingsToSW();
   if (s.enabled) showToast('✓ Godzina zapisana!');
-};
-
-// Test button — immediate notification to verify Brave allows it
-window.testNotif = async function() {
-  showToast('🧪 Testuję...');
-
-  if (!('Notification' in window)) { showToast('⚠ Brak wsparcia w tej przeglądarce'); return; }
-
-  const perm = Notification.permission;
-  if (perm === 'denied')  { showToast('⚠ Zablokowane — odblokuj w ustawieniach Brave'); return; }
-  if (perm === 'default') {
-    const req = await Notification.requestPermission();
-    if (req !== 'granted') { showToast('⚠ Brak zgody'); return; }
-  }
-
-  // Try SW first (with 2s timeout), fallback to direct Notification
-  try {
-    const swReady = new Promise((res, rej) => {
-      const t = setTimeout(() => rej(new Error('SW timeout')), 2000);
-      navigator.serviceWorker.ready.then(r => { clearTimeout(t); res(r); }).catch(rej);
-    });
-    const reg = await swReady;
-    await reg.showNotification('🏆 Life Grind Tracker', {
-      body: '✅ Test działa! Powiadomienia są aktywne.',
-      tag: 'test-notif',
-      renotify: true,
-    });
-    showToast('✅ Powiadomienie wysłane!');
-  } catch(swErr) {
-    // Direct fallback — works if tab is focused
-    try {
-      new Notification('🏆 Life Grind Tracker', { body: '✅ Test (tryb bezpośredni)' });
-      showToast('✅ Wysłano (tryb bezpośredni)');
-    } catch(e) {
-      showToast('⚠ Błąd: ' + e.message);
-    }
-  }
 };
 
 function initNotif() {
