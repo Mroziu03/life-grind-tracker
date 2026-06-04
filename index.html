@@ -1928,19 +1928,38 @@ window.saveNotifTime = function() {
 
 // Test button — immediate notification to verify Brave allows it
 window.testNotif = async function() {
-  if (!('Notification' in window)) { showToast('⚠ Brak wsparcia'); return; }
-  if (Notification.permission !== 'granted') {
-    showToast('⚠ Najpierw włącz powiadomienia'); return;
+  showToast('🧪 Testuję...');
+
+  if (!('Notification' in window)) { showToast('⚠ Brak wsparcia w tej przeglądarce'); return; }
+
+  const perm = Notification.permission;
+  if (perm === 'denied')  { showToast('⚠ Zablokowane — odblokuj w ustawieniach Brave'); return; }
+  if (perm === 'default') {
+    const req = await Notification.requestPermission();
+    if (req !== 'granted') { showToast('⚠ Brak zgody'); return; }
   }
+
+  // Try SW first (with 2s timeout), fallback to direct Notification
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const swReady = new Promise((res, rej) => {
+      const t = setTimeout(() => rej(new Error('SW timeout')), 2000);
+      navigator.serviceWorker.ready.then(r => { clearTimeout(t); res(r); }).catch(rej);
+    });
+    const reg = await swReady;
     await reg.showNotification('🏆 Life Grind Tracker', {
       body: '✅ Test działa! Powiadomienia są aktywne.',
       tag: 'test-notif',
+      renotify: true,
     });
-  } catch(e) {
-    // SW fallback: direct Notification
-    new Notification('🏆 Life Grind Tracker', { body: '✅ Test działa!' });
+    showToast('✅ Powiadomienie wysłane!');
+  } catch(swErr) {
+    // Direct fallback — works if tab is focused
+    try {
+      new Notification('🏆 Life Grind Tracker', { body: '✅ Test (tryb bezpośredni)' });
+      showToast('✅ Wysłano (tryb bezpośredni)');
+    } catch(e) {
+      showToast('⚠ Błąd: ' + e.message);
+    }
   }
 };
 
