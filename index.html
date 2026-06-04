@@ -894,6 +894,24 @@
 
     <button class="save-btn" onclick="saveDay()" style="margin-top:20px">💾 Zapisz dzień</button>
   </div>
+
+  <!-- Notification settings card -->
+  <div class="card" style="margin-top:12px;padding:16px 20px">
+    <div class="card-title" style="margin-bottom:14px">🔔 PRZYPOMNIENIE DZIENNIKA</div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <button id="notifToggleBtn" onclick="toggleNotif()"
+        style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;padding:9px 16px;
+               border-radius:8px;border:1px solid var(--divider);background:var(--bg3);
+               color:var(--muted);cursor:pointer;transition:all .2s;white-space:nowrap">
+        🔕 Wyłączone
+      </button>
+      <div class="field" style="margin:0;min-width:130px">
+        <label>Godzina</label>
+        <input type="time" id="notifTime" value="20:00" onchange="saveNotifTime()">
+      </div>
+      <div id="notifStatus" style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);line-height:1.5"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════ TYGODNIK ══════════════ -->
@@ -1222,10 +1240,12 @@ onAuthStateChanged(auth, async (user) => {
     buildMonthSelect();
     buildCalMonthSelect();
     loadDayPanel();
+    initNotif();
   } else {
     currentUser = null;
     localCache = JSON.parse(localStorage.getItem('lifeGrind_v1') || '{}');
     loadGoals();
+    initNotif();
     overlay.style.display = 'flex';
     authArea.innerHTML = '';
   }
@@ -1821,6 +1841,86 @@ document.addEventListener('click', e => {
   const el = e.target.closest('.goal-editable');
   if (el) startGoalEdit(el);
 });
+
+// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+const NOTIF_KEY = 'lifeGrind_notif';
+const loadNotifSettings = () => { try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || '{}'); } catch { return {}; } };
+const saveNotifSettingsData = s => localStorage.setItem(NOTIF_KEY, JSON.stringify(s));
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try { await navigator.serviceWorker.register('/sw.js'); } catch(e) {}
+}
+
+function updateNotifUI(s) {
+  const btn = document.getElementById('notifToggleBtn');
+  const status = document.getElementById('notifStatus');
+  if (!btn) return;
+  if (s.enabled && Notification.permission === 'granted') {
+    btn.textContent = '🔔 Włączone';
+    btn.style.cssText += ';background:rgba(80,250,123,.12);color:var(--green);border-color:rgba(80,250,123,.4)';
+    status.innerHTML = `Przypomnienie o <b style="color:var(--green)">${s.time||'20:00'}</b><br>Działa gdy przeglądarka jest otwarta`;
+  } else {
+    btn.textContent = '🔕 Wyłączone';
+    btn.style.cssText += ';background:var(--bg3);color:var(--muted);border-color:var(--divider)';
+    status.textContent = Notification.permission === 'denied'
+      ? '⚠ Zablokowane w przeglądarce — odblokuj ręcznie w ustawieniach'
+      : 'Kliknij żeby włączyć codzienny reminder';
+  }
+}
+
+window.toggleNotif = async function() {
+  if (!('Notification' in window)) { showToast('⚠ Przeglądarka nie obsługuje powiadomień'); return; }
+  const s = loadNotifSettings();
+  if (s.enabled) {
+    s.enabled = false;
+    saveNotifSettingsData(s);
+    updateNotifUI(s);
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { updateNotifUI(s); showToast('⚠ Brak zgody na powiadomienia'); return; }
+  s.enabled = true;
+  s.time = document.getElementById('notifTime').value || '20:00';
+  saveNotifSettingsData(s);
+  updateNotifUI(s);
+  showToast('🔔 Przypomnienie włączone!');
+};
+
+window.saveNotifTime = function() {
+  const s = loadNotifSettings();
+  s.time = document.getElementById('notifTime').value;
+  saveNotifSettingsData(s);
+  if (s.enabled) showToast('✓ Godzina zapisana!');
+};
+
+function initNotif() {
+  const s = loadNotifSettings();
+  const input = document.getElementById('notifTime');
+  if (s.time && input) input.value = s.time;
+  updateNotifUI(s);
+
+  setInterval(() => {
+    const settings = loadNotifSettings();
+    if (!settings.enabled || Notification.permission !== 'granted') return;
+    const now = new Date();
+    const [h, m] = (settings.time || '20:00').split(':').map(Number);
+    const today = dateKey(now);
+    if (now.getHours() === h && now.getMinutes() === m && settings.lastNotified !== today) {
+      settings.lastNotified = today;
+      saveNotifSettingsData(settings);
+      const dayData = localCache[today] || {};
+      const filled = Object.keys(dayData).filter(k => k !== 'zadania').length > 0;
+      navigator.serviceWorker.ready.then(reg => reg.showNotification('🏆 Life Grind Tracker', {
+        body: filled ? 'Masz niezapisane dane — uzupełnij dziennik! 📅' : 'Nie zapomnij uzupełnić dziennika na dziś! 📅',
+        tag: 'daily-reminder',
+        renotify: false,
+      }));
+    }
+  }, 60000);
+}
+
+registerSW();
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
 function showToast(msg) {
