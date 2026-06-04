@@ -610,6 +610,95 @@
   }
   .task-del:hover { color: var(--red); }
 
+  /* CUSTOM HABITS */
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title-row .card-title { margin-bottom: 0; flex: 1; }
+  .habit-mgr-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--divider);
+    background: var(--bg3);
+    color: var(--muted);
+    cursor: pointer;
+    letter-spacing: .5px;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .habit-mgr-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .habit-manager {
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .habit-manager.open { display: block; }
+  .habit-manager-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .habit-manager-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--white);
+  }
+  .habit-manager-item .hm-label { flex: 1; }
+  .habit-manager-item .hm-type {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    background: var(--bg4);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .habit-manager-item .hm-del {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 16px; padding: 0 2px;
+    transition: color .15s; line-height: 1;
+  }
+  .habit-manager-item .hm-del:hover { color: var(--red); }
+  .habit-add-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    border-top: 1px solid var(--divider);
+    padding-top: 12px;
+  }
+  .habit-add-row input {
+    flex: 1;
+    min-width: 120px;
+    background: var(--bg4);
+    border: 1px solid var(--divider);
+    color: var(--white);
+    padding: 7px 10px;
+    border-radius: 7px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    outline: none;
+  }
+  .habit-add-row input:focus { border-color: var(--accent); }
+  .habit-add-row select {
+    background: var(--bg4);
+    border: 1px solid var(--divider);
+    color: var(--white);
+    padding: 7px 10px;
+    border-radius: 7px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    outline: none;
+    cursor: pointer;
+  }
+  .habit-add-row .task-add-btn { padding: 7px 14px; }
+
   /* NOTIFICATIONS */
   .notif-row {
     display: flex;
@@ -902,6 +991,8 @@
         <input type="number" id="field-waga" step="0.1" placeholder="74.0">
       </div>
     </div>
+
+    <div id="customHabitsSection"></div>
 
     <div class="section-divider"></div>
     <div class="form-grid" style="grid-template-columns:1fr">
@@ -1355,6 +1446,9 @@ function loadDayPanel() {
   renderStreaks();
   renderTodayTasks();
   renderTomorrowTasksList();
+  // Reset custom toggle state before rendering
+  Object.keys(customToggleState).forEach(k => delete customToggleState[k]);
+  renderCustomHabits();
   const day = getDayData(currentDate);
   ['kcal','woda','czytanie','nastoj','energia','stres','praca','zarobek','waga','notatka'].forEach(f => {
     const el = document.getElementById('field-'+f);
@@ -1368,6 +1462,15 @@ window.saveDay = function() {
   ['kcal','woda','czytanie','nastoj','energia','stres','praca','zarobek','waga','notatka'].forEach(f => {
     const el = document.getElementById('field-'+f);
     if (el && el.value !== '') obj[f] = el.value;
+  });
+  // Collect custom habit values
+  getCustomHabits().forEach(h => {
+    if (h.type === 'toggle' && customToggleState[h.id]) {
+      obj[h.id] = customToggleState[h.id];
+    } else if (h.type === 'number') {
+      const el = document.getElementById('habit-' + h.id);
+      if (el && el.value !== '') obj[h.id] = el.value;
+    }
   });
   Object.assign(obj, toggleState);
   saveDayData(currentDate, obj);
@@ -1717,6 +1820,112 @@ window.switchTab = function(name, btn) {
   if(name==='kalendarz') renderCalendar();
   if(name==='coach') renderCoachPreview();
   if(name==='cele') renderGoals();
+};
+
+// ── CUSTOM HABITS ─────────────────────────────────────────────────────────────
+const HABITS_KEY = 'lifeGrind_customHabits';
+let habitManagerOpen = false;
+
+function getCustomHabits() {
+  try { return JSON.parse(localStorage.getItem(HABITS_KEY) || '[]'); } catch { return []; }
+}
+function setCustomHabits(h) { localStorage.setItem(HABITS_KEY, JSON.stringify(h)); }
+
+function renderCustomHabits() {
+  const container = document.getElementById('customHabitsSection');
+  if (!container) return;
+  const habits = getCustomHabits();
+  const day = getDayData(currentDate);
+
+  // Manager panel (edit mode)
+  const managerHtml = `
+    <div class="habit-manager ${habitManagerOpen ? 'open' : ''}" id="habitManager">
+      <div class="habit-manager-list" id="habitManagerList">
+        ${habits.length
+          ? habits.map(h => `
+            <div class="habit-manager-item">
+              <span class="hm-label">${h.label}</span>
+              <span class="hm-type">${h.type === 'toggle' ? 'T/N' : 'Liczba'}</span>
+              <button class="hm-del" onclick="removeCustomHabit('${h.id}')">×</button>
+            </div>`).join('')
+          : `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">Brak nawyków — dodaj poniżej</div>`
+        }
+      </div>
+      <div class="habit-add-row">
+        <input id="habitLabelInput" placeholder="Nazwa nawyku..." maxlength="30"
+               onkeydown="if(event.key==='Enter') addCustomHabit()">
+        <select id="habitTypeInput">
+          <option value="toggle">T / N</option>
+          <option value="number">Liczba</option>
+        </select>
+        <button class="task-add-btn" onclick="addCustomHabit()">+ Dodaj</button>
+      </div>
+    </div>`;
+
+  // Fields grid
+  const fieldsHtml = habits.length ? `
+    <div class="form-grid">
+      ${habits.map(h => {
+        const val = day[h.id] || '';
+        if (h.type === 'toggle') {
+          return `<div class="field">
+            <label>${h.label}</label>
+            <div class="toggle-group" id="toggle-${h.id}">
+              <button class="toggle-btn ${val==='T'?'active-yes':''}" onclick="setCustomHabitToggle('${h.id}','T',this)">T</button>
+              <button class="toggle-btn ${val==='N'?'active-no':''}" onclick="setCustomHabitToggle('${h.id}','N',this)">N</button>
+            </div>
+          </div>`;
+        } else {
+          return `<div class="field">
+            <label>${h.label}</label>
+            <input type="number" id="habit-${h.id}" value="${val}" placeholder="0">
+          </div>`;
+        }
+      }).join('')}
+    </div>` : '';
+
+  container.innerHTML = `
+    <div class="section-divider"></div>
+    <div class="section-title-row">
+      <div class="card-title">⭐ MOJE NAWYKI</div>
+      <button class="habit-mgr-btn" onclick="toggleHabitManager()">
+        ${habitManagerOpen ? '✕ Zamknij' : '⚙ Zarządzaj'}
+      </button>
+    </div>
+    ${managerHtml}
+    ${fieldsHtml}`;
+}
+
+window.toggleHabitManager = function() {
+  habitManagerOpen = !habitManagerOpen;
+  renderCustomHabits();
+  if (habitManagerOpen) setTimeout(() => document.getElementById('habitLabelInput')?.focus(), 50);
+};
+
+window.addCustomHabit = function() {
+  const label = document.getElementById('habitLabelInput')?.value.trim();
+  if (!label) return;
+  const type  = document.getElementById('habitTypeInput')?.value || 'toggle';
+  const id    = 'cus_' + Date.now();
+  const habits = getCustomHabits();
+  habits.push({ id, label, type });
+  setCustomHabits(habits);
+  renderCustomHabits();
+  document.getElementById('habitLabelInput').value = '';
+  document.getElementById('habitLabelInput').focus();
+};
+
+window.removeCustomHabit = function(id) {
+  setCustomHabits(getCustomHabits().filter(h => h.id !== id));
+  renderCustomHabits();
+};
+
+const customToggleState = {};
+window.setCustomHabitToggle = function(id, val, btn) {
+  customToggleState[id] = val;
+  const grp = document.getElementById('toggle-' + id);
+  if (grp) grp.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active-yes','active-no'));
+  btn.classList.add(val === 'T' ? 'active-yes' : 'active-no');
 };
 
 // ── TASKS ─────────────────────────────────────────────────────────────────────
