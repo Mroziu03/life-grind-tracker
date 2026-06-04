@@ -540,6 +540,29 @@
 
   select option { background: var(--bg2); }
 
+  /* AI COACH SPINNER */
+  .coach-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--divider);
+    border-top-color: var(--accent3);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .coach-day-chip {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--divider);
+    color: var(--muted);
+    letter-spacing: .5px;
+  }
+  .coach-day-chip.has { border-color: rgba(123,104,238,.4); color: var(--accent2); }
+
   .section-divider {
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--divider), transparent);
@@ -578,6 +601,7 @@
   <button class="tab" onclick="switchTab('wykresy', this)">📈 Wykresy</button>
   <button class="tab" onclick="switchTab('cele', this)">🎯 Cele</button>
   <button class="tab" onclick="switchTab('kalendarz', this)">🗓️ Kalendarz</button>
+  <button class="tab" onclick="switchTab('coach', this)">🤖 AI Coach</button>
 </div>
 
 <div class="container">
@@ -813,6 +837,32 @@
 
     <!-- Calendar grid -->
     <div id="calGrid"></div>
+  </div>
+</div>
+
+<!-- ══════════════ AI COACH ══════════════ -->
+<div id="panel-coach" class="panel">
+  <div class="card">
+    <div class="card-title">🤖 AI COACH</div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:20px;line-height:1.7">
+      Coach analizuje Twoje ostatnie 7 dni i daje konkretny feedback.<br>
+      Dane: trening, kcal, nastrój, energia, nauka, zarobek, notatki.
+    </div>
+    <div id="coachDataPreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px"></div>
+    <button class="save-btn" id="coachBtn" onclick="runCoach()" style="background:linear-gradient(135deg,var(--accent),var(--accent3));max-width:320px">
+      ✨ Pobierz analizę AI
+    </button>
+    <div id="coachSpinner" style="display:none;margin-top:28px;text-align:center">
+      <div class="coach-spinner"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);margin-top:12px;letter-spacing:1px">ANALIZUJĘ TWOJE DANE...</div>
+    </div>
+    <div id="coachResult" style="display:none;margin-top:28px">
+      <div style="height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);margin-bottom:20px"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent2);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">ANALIZA AI COACH</div>
+      <div id="coachText" style="font-size:15px;line-height:1.8;color:var(--white);white-space:pre-wrap"></div>
+      <div id="coachTimestamp" style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);margin-top:16px;letter-spacing:.5px"></div>
+    </div>
+    <div id="coachError" style="display:none;margin-top:20px;padding:14px 16px;background:rgba(255,85,85,.1);border:1px solid rgba(255,85,85,.3);border-radius:8px;font-family:'Space Mono',monospace;font-size:11px;color:var(--red)"></div>
   </div>
 </div>
 
@@ -1329,6 +1379,62 @@ window.calClick = function(key) {
   loadDayPanel();
 };
 
+// ── AI COACH ──────────────────────────────────────────────────────────────────
+function renderCoachPreview() {
+  const chips = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
+    const k = dateKey(d);
+    const has = !!localCache[k];
+    const label = i===0 ? 'Dziś' : `${d.getDate()}.${String(d.getMonth()+1).padStart(2,'0')}`;
+    chips.push(`<span class="coach-day-chip${has?' has':''}">${label}</span>`);
+  }
+  document.getElementById('coachDataPreview').innerHTML = chips.join('');
+}
+
+window.runCoach = async function() {
+  const btn = document.getElementById('coachBtn');
+  const spinner = document.getElementById('coachSpinner');
+  const result = document.getElementById('coachResult');
+  const errEl = document.getElementById('coachError');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Analizuję...';
+  spinner.style.display = 'block';
+  result.style.display = 'none';
+  errEl.style.display = 'none';
+
+  const last7 = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
+    const k = dateKey(d);
+    if (localCache[k]) last7[k] = localCache[k];
+  }
+
+  try {
+    const res = await fetch('/.netlify/functions/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackerData: last7 }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    document.getElementById('coachText').textContent = data.analysis;
+    const now = new Date();
+    document.getElementById('coachTimestamp').textContent =
+      `Wygenerowano: ${now.toLocaleDateString('pl-PL')} ${now.toLocaleTimeString('pl-PL', {hour:'2-digit',minute:'2-digit'})}`;
+    result.style.display = 'block';
+  } catch (e) {
+    errEl.textContent = '⚠ ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    spinner.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '✨ Pobierz analizę AI';
+  }
+};
+
 // ── TABS ──────────────────────────────────────────────────────────────────────
 window.switchTab = function(name, btn) {
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -1339,6 +1445,7 @@ window.switchTab = function(name, btn) {
   if(name==='miesiac') renderMonth();
   if(name==='wykresy') renderCharts();
   if(name==='kalendarz') renderCalendar();
+  if(name==='coach') renderCoachPreview();
 };
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────

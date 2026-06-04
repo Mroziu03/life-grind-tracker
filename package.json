@@ -1,5 +1,5 @@
 {
-  "name": "life-grind-tracker-functions",
+  "name": "life-grind-tracker",
   "version": "1.0.0",
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0"

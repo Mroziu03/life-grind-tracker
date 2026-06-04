@@ -1,5 +1,7 @@
 [build]
+  publish = "."
   functions = "functions"
 
 [functions]
   node_bundler = "esbuild"
+  included_files = ["functions/**"]

@@ -1,0 +1,5 @@
+node_modules/
+.env
+.env.local
+.claude/launch.json
+.DS_Store
