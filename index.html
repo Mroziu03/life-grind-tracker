@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Life Grind Tracker</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1027,9 +1028,14 @@
       Dane: trening, kcal, nastrój, energia, nauka, zarobek, notatki.
     </div>
     <div id="coachDataPreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px"></div>
-    <button class="save-btn" id="coachBtn" onclick="runCoach()" style="background:linear-gradient(135deg,var(--accent),var(--accent3));max-width:320px">
-      ✨ Pobierz analizę AI
-    </button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="save-btn" id="coachBtn" onclick="runCoach()" style="background:linear-gradient(135deg,var(--accent),var(--accent3));max-width:320px;flex:1;min-width:180px">
+        ✨ Pobierz analizę AI
+      </button>
+      <button id="coachCopyBtn" class="save-btn" onclick="copyCoachPrompt()" style="background:linear-gradient(135deg,var(--accent2),var(--accent));max-width:320px;display:none;min-width:140px">
+        📋 Kopiuj do Claude
+      </button>
+    </div>
     <div id="coachSpinner" style="display:none;margin-top:28px;text-align:center">
       <div class="coach-spinner"></div>
       <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);margin-top:12px;letter-spacing:1px">ANALIZUJĘ TWOJE DANE...</div>
@@ -1576,6 +1582,7 @@ window.calClick = function(key) {
 
 // ── AI COACH ──────────────────────────────────────────────────────────────────
 const COACH_HISTORY_KEY = 'lifeGrind_coachHistory';
+let lastCoachPrompt = null;
 
 function loadCoachHistory() {
   try { return JSON.parse(localStorage.getItem(COACH_HISTORY_KEY) || '[]'); }
@@ -1656,6 +1663,22 @@ window.runCoach = async function() {
   }
 
   try {
+    // Build prompt for Claude desktop copy
+    const promptLines = [];
+    promptLines.push('=== TWOJE CELE ===');
+    if (userGoals?.length) userGoals.forEach(g => promptLines.push(`• ${g.name} (${g.detail}): ${g.badge}`));
+    promptLines.push('');
+    promptLines.push('=== DANE Z OSTATNICH 7 DNI ===');
+    Object.entries(last7).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,d])=>{
+      const parts=[`[${date}]`];
+      if(d.trening)parts.push(`trening=${d.trening}`);if(d.kcal)parts.push(`kcal=${d.kcal}`);
+      if(d.nastoj)parts.push(`nastoj=${d.nastoj}/10`);if(d.energia)parts.push(`energia=${d.energia}/10`);
+      if(d.notatka)parts.push(`notatka="${d.notatka}"`);
+      promptLines.push(parts.join(' | '));
+    });
+    lastCoachPrompt = promptLines.join('\n');
+    document.getElementById('coachCopyBtn').style.display = 'block';
+
     const res = await fetch('/.netlify/functions/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1939,6 +1962,15 @@ window.saveNotifTime = function() {
   s.lastNotifiedAt = 0;
   saveNotifSettingsData(s); sendSettingsToSW();
   if (s.enabled) showToast('✓ Godzina zapisana!');
+};
+
+window.copyCoachPrompt = function() {
+  if (!lastCoachPrompt) { showToast('⚠ Brak promptu do kopiowania'); return; }
+  navigator.clipboard.writeText(lastCoachPrompt).then(() => {
+    showToast('✅ Skopiowano do schowka — wklej w Claude!');
+  }).catch(() => {
+    showToast('⚠ Błąd kopiowania');
+  });
 };
 
 function initNotif() {
