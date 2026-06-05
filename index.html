@@ -1942,15 +1942,15 @@ function getYesterdayKey() {
 
 function renderTodayTasks() {
   const container = document.getElementById('todayTasks');
-  // tasks for today were planned yesterday
-  const src = localCache[getYesterdayKey()] || {};
-  const tasks = src.zadania || [];
+  // tasks for today are stored in today's record (added the day before via "zadania na jutro")
+  const todayKey = dateKey(currentDate);
+  const tasks = (localCache[todayKey] || {}).zadania || [];
   if (!tasks.length) { container.innerHTML = ''; return; }
 
   const items = tasks.map((t, i) => `
     <div class="task-item">
       <input type="checkbox" class="task-checkbox" ${t.done ? 'checked' : ''}
-             onchange="toggleTodayTask('${getYesterdayKey()}', ${i}, this.checked)">
+             onchange="toggleTodayTask('${todayKey}', ${i}, this.checked)">
       <span class="task-text${t.done ? ' done' : ''}">${t.text}</span>
     </div>`).join('');
 
